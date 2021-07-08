@@ -1,8 +1,8 @@
 /*
   HOW TO RUN -
   ----------
-  -> javac DataGenerator.java
-  -> java DataGenerator
+  -> javac -cp jackson/* DataGenerator.java
+  -> java --module-path jackson/ --add-modules ALL-MODULE-PATH DataGenerator
 
     Give required inputs
 */
@@ -10,28 +10,75 @@
 import java.lang.*;
 import java.util.*;
 import java.io.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonGenerationException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+
+
+class Data {
+    public String name;
+    public List<Compartment> nodes;
+    public List<Edge> edges;
+    public String description;
+
+    public Data() {
+      nodes = new ArrayList<Compartment>();
+      edges = new ArrayList<Edge>();
+    }
+}
+
+class Compartment {
+    public String id;
+    public String name;
+    public List<Resources> resources;
+    public List<Compartment> children;
+
+    public Compartment() {
+      resources = new ArrayList<Resources>();
+      children = new ArrayList<Compartment>();
+    }
+}
+
+class Resources {
+    public String resourceType;
+    public List<String> items;
+
+    public Resources() {
+      items = new ArrayList<String>();
+    }
+}
+
+class Edge {
+    public String source;
+    public List<String> target;
+
+    public Edge() {
+      target = new ArrayList<String>();
+    }
+}
+
+
+// To store the list of resources
+class ResourcesList {
+  ArrayList<ArrayList<String>> resources = new ArrayList<ArrayList<String>>(5);
+
+  public ResourcesList() {
+      for (int i = 0; i < 5; i++) {
+          this.resources.add(new ArrayList<String>());
+      }
+  }
+}
 
 class DataGenerator {
+
+  // To store output
+  static Data outputData = new Data();
 
   // To scan inputs from terminal
   static Scanner input = new Scanner(System.in);
 
-  // To store the data
-  static StringBuilder data = new StringBuilder();
-
-  // To store the list of resources
-  static class Resources {
-    ArrayList<ArrayList<String>> resources = new ArrayList<ArrayList<String>>(5);
-
-    public Resources() {
-        for (int i = 0; i < 5; i++) {
-            this.resources.add(new ArrayList<String>());
-        }
-    }
-  }
-
   // Maps compartment to its list of resources
-  static HashMap<String, Resources> resourcesList = new HashMap<String, Resources>();
+  static HashMap<String, ResourcesList> resourcesList = new HashMap<String, ResourcesList>();
 
   // Unique id to each compartment and resources
   static int ocid = 0;
@@ -39,18 +86,15 @@ class DataGenerator {
   // Counts the total number of resources
   static int allResources = 0;
 
-  // To give proper indentation to the data created
-  public static void indentationLogic(int noOfGaps) {
-    for(int i=0;i<noOfGaps;i++)
-    {
-      data.append(" ");
-    }
-  }
 
   // Takes care of the logic related to key "nodes" (in Json format) while creating data
-  public static void nodeLogic(int noOfCompartments, int level, int indentation) {
+  public static List<Compartment> nodeLogic(int noOfCompartments, int level) {
 
+      List<Compartment> listOfCompartments = new ArrayList<Compartment> ();
       for(int i=1;i<=noOfCompartments;i++) {
+
+        Compartment comp = new Compartment();
+
         int noOfChildren;
         int[] noOfResources = {0,0,0,0,0};
         int last = 0;
@@ -78,92 +122,53 @@ class DataGenerator {
         }
 
         // ------------ WRITING DATA OF EACH COMPARTMENT (NODE) ------------
-        indentationLogic(indentation);
-        data.append("{\n");
-
-        indentationLogic(indentation+2);
-        data.append("\"id\":");
-        data.append("\"ocid.compartment." + ocid + "\",\n");
 
       	String compartmentId = "ocid.compartment." + ocid;
         ocid = ocid + 1;
 
-        indentationLogic(indentation+2);
-        data.append("\"name\":");
-        data.append("\"" + compartmentName + "\",\n");
+        comp.id = compartmentId;
+        comp.name = compartmentName;
 
-        indentationLogic(indentation+2);
-        data.append("\"resources\": [\n");
-
-        resourcesList.put(compartmentId, new Resources());
+        resourcesList.put(compartmentId, new ResourcesList());
 
         // ------------ WRITING THE LIST OF RESOURCES BELONGING TO THE COMPARTMENT ------------
         for(int j=0;j<5;j++)
         {
           if(noOfResources[j]!=0)
           {
-            indentationLogic(indentation+4);
-            data.append("{\n");
-
-            indentationLogic(indentation+6);
-            data.append("\"resourceType\":");
-            data.append("\"" + resourceTypes[j] + "\",\n");
-
-            indentationLogic(indentation+6);
-            data.append("\"items\": [\n");
+            Resources res = new Resources();
+            res.resourceType = resourceTypes[j];
 
             for(int k=0;k<noOfResources[j];k++)
             {
-              indentationLogic(indentation+8);
-
               String r = "ocid." + resourceTypes[j] + "." + ocid;
-              data.append("\"" + r + "\"");
+              res.items.add(r);
 
               resourcesList.get(compartmentId).resources.get(j).add(r);
               allResources++;
 
               ocid = ocid + 1;
-
-              if(k == noOfResources[j]-1) data.append("\n");
-              else data.append(",\n");
             }
-
-            indentationLogic(indentation+6);
-            data.append("]\n");
-
-            indentationLogic(indentation+4);
-            data.append("}");
-
-            if(j==last) data.append("\n");
-            else data.append(",\n");
+            comp.resources.add(res);
           }
         }
-        indentationLogic(indentation+2);
-        data.append("],\n");
 
         // ------------ WRITING THE INFORMATION OF CHILDREN BELONGING TO THE COMPARTMENT ------------
-        indentationLogic(indentation+2);
-        data.append("\"children\": [\n");
+        comp.children = nodeLogic(noOfChildren,level+1); // RECURSION
 
-        nodeLogic(noOfChildren,level+1,indentation+4); // RECURSION
-
-        indentationLogic(indentation+2);
-        data.append("]\n");
-
-        indentationLogic(indentation);
-        data.append("}");
-
-        if(i==noOfCompartments) data.append("\n");
-        else data.append(",\n");
+        listOfCompartments.add(comp);
       }
+
+      return listOfCompartments;
   }
 
   // Takes care of the logic related to key "edges" (in Json format) while creating data
-  public static void edgeLogic(int indentation) {
+  public static List<Edge> edgeLogic() {
 
+    List<Edge> listOfEdges = new ArrayList<Edge> ();
     for (String compartment : resourcesList.keySet())
   	{
-      Resources eachCompartment = resourcesList.get(compartment);
+      ResourcesList eachCompartment = resourcesList.get(compartment);
 
       int s = eachCompartment.resources.size();
       for(int i=0;i < s-1;i++)
@@ -182,45 +187,28 @@ class DataGenerator {
         // ------------ WRITING SOURCE - TARGET PAIRS ------------
         for(int j = 0; j < p; j++)
         {
-          indentationLogic(indentation);
-  				data.append("{\n");
-
-  				indentationLogic(indentation+2);
-  				data.append("\"source\":");
-  				data.append("\"" + parent.get(j) + "\",\n");
-
-  				indentationLogic(indentation + 2);
-  				data.append("\"target\": [\n");
+          Edge edge = new Edge();
+  				edge.source = parent.get(j);
 
   				int count = ch / p;
   				if (j < l) count++;
 
           for(int k = 0; k < count; k++)
   				{
-  					indentationLogic(indentation + 4);
-  					data.append("\"" + children.get(pointer+k) + "\"");
-
-  					if (k == count - 1) data.append("\n");
-  					else data.append(",\n");
+  					edge.target.add(children.get(pointer+k));
   				}
   				pointer += count;
 
-  				indentationLogic(indentation+2);
-  				data.append("]\n");
-
-  				indentationLogic(indentation);
-  				data.append("},\n");
+          listOfEdges.add(edge);
         }
       }
   	}
 
-    data.deleteCharAt(data.length() - 2);
+    return listOfEdges;
   }
 
 
   public static void main(String[] args) {
-
-    data.append("{\n");
 
     // ------------ NAME FOR THE DATA ------------
     String name;
@@ -228,27 +216,17 @@ class DataGenerator {
     System.out.println("Give name to this mock scenario : ");
     name = input.nextLine();
 
-    data.append("  \"name\": ");
-    data.append("\"" + name + "\",\n");
+    outputData.name = name;
 
     // ------------ WRITING NODES INTO DATA ------------
-    data.append("  \"nodes\": [\n");
-
-    int indentation = 4;
-    nodeLogic(1,0,indentation);
-
-    data.append("  ],\n");
+    outputData.nodes = nodeLogic(1,0);
 
     // ------------ WRITING EDGES INTO DATA ------------
-    data.append("  \"edges\": [\n");
 
     if(allResources > 0)
     {
-      indentation = 4;
-      edgeLogic(indentation);
+      outputData.edges = edgeLogic();
     }
-
-    data.append("  ],\n");
 
     // ------------ WRITING DESCRIPTION INTO DATA ------------
     String description;
@@ -256,16 +234,29 @@ class DataGenerator {
     System.out.println("Give descrition to this mock scenario : ");
     description = input.nextLine();
 
-    data.append("  \"description\": ");
-    data.append("\"" + description + "\"\n");
-    data.append("}\n");
+    outputData.description = description;
+
+    try {
+      ObjectMapper objectMapper = new ObjectMapper();
+
+      String jsonInStringPretty = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(outputData);
+      System.out.println(jsonInStringPretty);
+    } catch (JsonGenerationException e) {
+           e.printStackTrace();
+    } catch (JsonMappingException e) {
+           e.printStackTrace();
+    } catch (IOException e) {
+           e.printStackTrace();
+    }
+
+    // System.out.println(outputData.toString());
 
     // Writing data into file
-    File file = new File("mockScenario.txt");
-    try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-        writer.append(data);
-    } catch (IOException e) {
-      System.out.println(e);
-    }
+    // File file = new File("mockScenario.txt");
+    // try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+    //     writer.append(data);
+    // } catch (IOException e) {
+    //   System.out.println(e);
+    // }
   }
 }
