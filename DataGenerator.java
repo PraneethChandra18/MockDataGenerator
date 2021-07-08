@@ -15,6 +15,8 @@ import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 
 
+// Definition of data model
+
 class Data {
     public String name;
     public List<Compartment> nodes;
@@ -236,11 +238,11 @@ class DataGenerator {
 
     outputData.description = description;
 
+    String data = "Some error occured. Please check the definition of the data model";
+
     try {
       ObjectMapper objectMapper = new ObjectMapper();
-
-      String jsonInStringPretty = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(outputData);
-      System.out.println(jsonInStringPretty);
+      data = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(outputData);
     } catch (JsonGenerationException e) {
            e.printStackTrace();
     } catch (JsonMappingException e) {
@@ -249,14 +251,12 @@ class DataGenerator {
            e.printStackTrace();
     }
 
-    // System.out.println(outputData.toString());
-
     // Writing data into file
-    // File file = new File("mockScenario.txt");
-    // try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-    //     writer.append(data);
-    // } catch (IOException e) {
-    //   System.out.println(e);
-    // }
+    File file = new File("mockScenario.txt");
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+        writer.append(data);
+    } catch (IOException e) {
+      System.out.println(e);
+    }
   }
 }
